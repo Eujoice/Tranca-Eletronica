@@ -1,0 +1,101 @@
+#include <Keypad.h>
+#include <Password.h>
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+
+// Endereço 0x27 não funcionou
+LiquidCrystal_I2C lcd(0x50, 16, 2);
+
+// Senha pré-cadastrada
+Password senha = Password("123");
+
+const byte LINHAS = 4;
+const byte COLUNAS = 3;
+
+char matriz_teclas[LINHAS][COLUNAS] = {
+  {'1','2','3'},
+  {'4','5','6'},
+  {'7','8','9'},
+  {'*','0','#'}
+};
+
+byte PinosLinhas[LINHAS] = {4, 5, 6, 7};
+byte PinosColunas[COLUNAS] = {8, 9, 10};
+
+Keypad meuteclado = Keypad(makeKeymap(matriz_teclas), PinosLinhas, PinosColunas, LINHAS, COLUNAS);
+
+const int pinLed = 13;
+unsigned long tempoAbertura = 0;
+bool portaAberta = false;
+int contadorDigitos = 0;
+
+void setup() {
+  pinMode(pinLed, OUTPUT);
+  digitalWrite(pinLed, LOW);
+
+  lcd.init();
+  lcd.backlight();
+  exibirMensagemInicial();
+}
+
+void loop() {
+  char tecla = meuteclado.getKey();
+
+  if (portaAberta && (millis() - tempoAbertura >= 1000)) {
+    digitalWrite(pinLed, LOW);
+    portaAberta = false;
+    exibirMensagemInicial();
+  }
+
+  if (tecla) {
+    if (tecla == '*') {
+      verificarSenha();
+    } 
+    else if (tecla == '#') {
+      resetaSistema();
+    }
+    else {
+      if (contadorDigitos < 3) {
+        senha.append(tecla);
+        lcd.setCursor(contadorDigitos, 1);
+        lcd.print("*"); 
+        contadorDigitos++;
+      }
+    }
+  }
+}
+
+void verificarSenha() {
+  lcd.clear();
+  
+  // evaluate() é da biblioteca Keypad master e compara o que foi digitado com a senha padrão "123"
+  if (senha.evaluate()) {
+    lcd.print("Acesso");
+    lcd.setCursor(0, 1);
+    lcd.print("autorizado");
+
+    digitalWrite(pinLed, HIGH);
+    tempoAbertura = millis();
+    portaAberta = true;
+  } 
+  else {
+    lcd.print("Acesso nao");
+    lcd.setCursor(0, 1);
+    lcd.print("autorizado");
+    
+    delay(2000); 
+    resetaSistema();
+  }
+}
+
+void resetaSistema() {
+  senha.reset();
+  contadorDigitos = 0;
+  exibirMensagemInicial();
+}
+
+void exibirMensagemInicial() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Digite a senha:");
+}
